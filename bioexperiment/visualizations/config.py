@@ -7,6 +7,9 @@ from matplotlib.colors import ListedColormap
 
 
 class MatplotlibConfig:
+    """
+    A class with color and structure specifics
+    """
 
     top = cm.get_cmap("Blues_r", 128)
     bottom = cm.get_cmap("Oranges", 128)

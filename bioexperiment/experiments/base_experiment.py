@@ -6,6 +6,11 @@ root = pathlib.Path(__file__).parent.parent.parent
 
 
 class Experiment(ABC):
+    """
+    Experiment class defines interface and deals with
+    experiment folder setup.
+    """
+
     def __init__(self, name: str):
         self.name = name
         self.experiment_date = dt.datetime.today()

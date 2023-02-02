@@ -4,11 +4,15 @@ root = Path(__file__).parent.parent
 
 
 class ProteinData:
+    """This class contains filenames that contain Protein data."""
+
     raw_file = "20210919_DIANN_SingleCellOutput.pg_matrix_notnormalized.tsv"
     normalized_file = "20210919_DIANN_SingleCellOutput.pg_matrix_cellcyclepred.tsv"
 
 
 class Smartseq:
+    """This class contains filenames that contain SMART-Seq2 data."""
+
     files = [
         "GSE129447_RAW/GSM3713084_HeLa_1.txt",
         "GSE129447_RAW/GSM3713085_HeLa_2.txt",
@@ -17,6 +21,8 @@ class Smartseq:
 
 
 class Dropseq:
+    """This class contains filenames that contain Drop-Seq data."""
+
     files = {
         1: {
             "exon": "GSE142277_RAW/"
@@ -39,4 +45,11 @@ class Dropseq:
     }
 
 
+class CoreProteome:
+    """This class contains filenames that contain Core Proteome data."""
+
+    file = "CoreProteome.txt"
+
+
+# Path to the folder where the data should be placed
 DATA_FOLDER = root / "data" / "experiment_data"

@@ -1,7 +1,9 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
+import anndata
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import scanpy as sc
 import scipy
 import seaborn as sns
@@ -13,14 +15,12 @@ from bioexperiment.visualizations.config import MatplotlibConfig, color
 
 
 def cell_cycle_stage_box_plot(data: AnnData, plot_path: str):
-
-    """This function plots a boxplot.
+    """
+    This function plots a boxplot.
 
     Args:
-        data (AnnData): data whose datapoints are plotted
-
-    Returns:
-        _type_: a matplotlib box plot
+        data (AnnData): Data whose datapoints are plotted
+        ploth_path (str): The directory path where the plot will be saved
     """
 
     size = {
@@ -44,6 +44,13 @@ def cell_cycle_stage_box_plot(data: AnnData, plot_path: str):
 
 
 def dump_text(text: str, path: str):
+    """
+    Writes description text from plots in a file
+
+    Args:
+        text (str): The description
+        path (str): The path to the file
+    """
     with open(path, "w") as f:
         f.write(text)
 
@@ -52,29 +59,32 @@ def pca_plot(
     data: AnnData,
     color_column: str,
     plot_path: str,
+    impute_downshifted: bool = True,
+    invert_axis: bool = False,
     **kwargs,
 ):
-
-    """This function plots a PCA plot.
+    """
+    A function that builds a Principal Component Analysis plot
 
     Args:
-        data (AnnData): data whose datapoints are plotted
-        color_scheme (str): defining a color scheme for the plot
-
-    Returns:
-        _type_: a matplotlib pca plot
+        data (AnnData): AnnData object
+        color_column (str): The color scheme the plot will follow
+        ploth_path (str): The directory path where the plot will be saved
+        impute_downshifted (bool, optional): Does the function need to be used or not. Defaults to True.
+        invert_axis (bool, optional): Should the axes be inverted. Defaults to False.
     """
-    impute_downshifted_normal_global(data, **kwargs)
+
+    if impute_downshifted:
+        impute_downshifted_normal_global(data, **kwargs)
+
     sc.pp.pca(data)
-    sc.pl.pca(data, color=color_column, annotate_var_explained=True, show=False)
+    ax = sc.pl.pca(data, color=color_column, annotate_var_explained=True, show=False)
+
+    if invert_axis:
+        ax.invert_xaxis()
+
     plt.savefig(plot_path)
     plt.close()
-
-    # The PCA number 2, the only different one from 1 and 3 (with joined)
-    # sc.pp.pca(joined)
-    # ax = sc.pl.pca(joined, color='dataset', show=False, annotate_var_explained=True)
-    # ax.invert_xaxis()
-    # plt.show()
 
 
 def cell_cycle_stage_prediction_plot(
@@ -83,14 +93,13 @@ def cell_cycle_stage_prediction_plot(
     plot_path: str,
     score_keys: List[str] = ["G1", "S", "G2-M"],
 ):
-
-    """This function plots a tp/tn plot.
+    """Building of a cell cycle stage visualization plot
 
     Args:
-        data (AnnData): data whose datapoints are plotted
-
-    Returns:
-        _type_: a matplotlib tp/tn plot
+        data (AnnData): AnnData object
+        classes_to_compare (Tuple[str, str]): Classess of Genes which will be compared in the plot
+        ploth_path (str): The directory path where the plot will be saved
+        score_keys (List[str], optional): Defaults to ["G1", "S", "G2-M"].
     """
 
     protein_data_nb_tb = data[
@@ -123,71 +132,80 @@ def cell_cycle_stage_prediction_plot(
     dump_text("\n".join(text_description), f"{plot_path}.description.txt")
 
 
-# same for both violin plots
-def completeness_distribution_plot(data: AnnData):
-
-    """This function plots a Violin plot.
+def completeness_distribution_plot(data: Dict[str, AnnData], plot_path: str):
+    """
+    This function plots a Violin plot.
 
     Args:
-        data (AnnData): data whose datapoints are plotted
-
-    Returns:
-        _type_: a matplotlib violin plot
+        data (AnnData): Data whose datapoints are plotted
+        ploth_path (str): The directory path where the plot will be saved
     """
 
     perc_expr = []
     dataset_name = []
     for datasetname, data in data.items():
-        print(f"{datasetname} {data.shape}")
-        perc_expr += list((data.X > 0).mean(axis=1))
-        dataset_name += [datasetname] * data.X.shape[0]
+        perc_expr += list((data.X > 0).mean(axis=1))  # type: ignore
+        dataset_name += [datasetname] * data.X.shape[0]  # type: ignore
     sns.violinplot(y=perc_expr, x=dataset_name)
     plt.ylabel("Gene/Protein expression completeness per cell")
-    plt.show()
+    plt.savefig(plot_path)
     plt.close()
 
 
-def pearson_corr_analysis_plot(full_data: AnnData, dataset_names: str):
-
-    """_summary_
-
-    Returns:
-        _type_: _description_
+# flake8: noqa: C901
+def pearson_corr_analysis_plot(
+    full_data: Dict[str, AnnData],
+    plot_path: str,
+):
     """
-    # TODO
-    MatplotlibConfig
-    # for adata in full_data.values():
-    #     np.random.shuffle(adata.X)
-    #
-    # joined = anndata.concat(full_data.values()) # performs inner join
-    # dataset_names = np.concatenate(
-    # [[name] * adata.shape[0] for name, adata in full_data.items()])
+    Function that visualized the Pearson Correlation analysis
+
+    Args:
+        full_data (Dict[str, AnnData]): All three datasets saved in a dictionary
+        ploth_path (str): The directory path where the plot will be saved
+    """
+    for adata in full_data.values():
+        np.random.shuffle(adata.X)
+
+    joined = anndata.concat(full_data.values())  # performs inner join
+    dataset_names = np.concatenate(
+        [[name] * adata.shape[0] for name, adata in full_data.items()]
+    )
+
     # print('number of shared genes:', joined.shape[1])
-    # c = np.array(pd.DataFrame(joined.X.T).corr())
+    c = np.array(pd.DataFrame(joined.X.T).corr())
 
-    # fig, ax = plt.subplots(
-    #     3, 3, figsize=(5, 5), gridspec_kw=dict(wspace=0.03, hspace=0.03)
-    # )
-    # for i, dataset_1 in enumerate(full_data.keys()):
-    #     for j, dataset_2 in enumerate(full_data.keys()):
-    #         subdata = c[dataset_names == dataset_1][:, dataset_names == dataset_2]
-    #         color_obj = ax[i, j].imshow(
-    #             subdata, vmin=-1, vmax=1, aspect="auto", cmap=MatplotlibConfig.newcmp
-    #         )
-    #         ax[i, j].set_xticks([])
-    #         ax[i, j].set_yticks([])
-    #         if i == 0:
-    #             ax[i, j].set_title(dataset_2, fontsize=11)
-    #         if j == 0:
-    #             ax[i, j].set_ylabel(dataset_1, fontsize=11)
-    #
-    # cbar_ax = fig.add_axes([0.92, 0.15, 0.05, 0.7])
-    # plt.colorbar(color_obj, cax=cbar_ax)
-    # plt.show()
+    fig, ax = plt.subplots(
+        3, 3, figsize=(5, 5), gridspec_kw=dict(wspace=0.03, hspace=0.03)
+    )
+    for i, dataset_1 in enumerate(full_data.keys()):
+        for j, dataset_2 in enumerate(full_data.keys()):
+            subdata = c[dataset_names == dataset_1][:, dataset_names == dataset_2]
+            color_obj = ax[i, j].imshow(
+                subdata, vmin=-1, vmax=1, aspect="auto", cmap=MatplotlibConfig.newcmp
+            )
+            ax[i, j].set_xticks([])
+            ax[i, j].set_yticks([])
+            if i == 0:
+                ax[i, j].set_title(dataset_2, fontsize=11)
+            if j == 0:
+                ax[i, j].set_ylabel(dataset_1, fontsize=11)
+
+    cbar_ax = fig.add_axes([0.92, 0.15, 0.05, 0.7])
+    plt.colorbar(color_obj, cax=cbar_ax)
+    plt.savefig(plot_path)
+    plt.close()
 
 
-def variance_analysis_plot(core_proteins: List, data: AnnData, dataset_name: str):
+def variance_analysis_plot(core_proteins: List, data: AnnData, plot_path: str):
+    """
+    A plot that analyses the variance of proteins and shows the results in a log 2 scale
 
+    Args:
+        core_proteins (List): Core proteins from the core proteome file
+        data (AnnData): AnnData object
+        ploth_path (str): The directory path where the plot will be saved
+    """
     data.var["core/noncore"] = [
         "Core proteome genes" if prot in core_proteins else "Other proteins"
         for prot in data.var_names
@@ -216,12 +234,21 @@ def variance_analysis_plot(core_proteins: List, data: AnnData, dataset_name: str
     g.ax_joint.set_ylim(-4, 4)
     g.ax_joint.plot([-6, 10], [3, -5], "--", c="black", label="Poisson distribution")
     g.ax_joint.legend(title=[])
-    plt.suptitle(dataset_name, y=1)
-    plt.show()
+    plt.savefig(plot_path)
+    plt.close()
 
 
-def variance_comparison_box_plot(core_proteins: List, full_data: AnnData):
+def variance_comparison_box_plot(
+    core_proteins: List, full_data: Dict[str, AnnData], plot_path: str
+):
+    """
+    A box plot that showes the comparison analysis between the three datasets
 
+    Args:
+        core_proteins (List): The core proteins from the proteome
+        full_data (AnnData): AnnData object
+        plot_path (str): The directory path where the plot will be saved
+    """
     cov = []
     hue = []
     dataset_name = []
@@ -245,11 +272,18 @@ def variance_comparison_box_plot(core_proteins: List, full_data: AnnData):
     )
     plt.ylabel("coefficient of variation")
     plt.ylim(top=6)
-    plt.show()
+    plt.savefig(plot_path)
+    plt.close()
 
 
 def local_regression_norm_plot(data_raw: AnnData, data_norm: AnnData):
+    """
+    Visualization of the local regression normalization
 
+    Args:
+        data_raw (AnnData): AnnData raw data object
+        data_norm (AnnData): AnnData raw data object
+    """
     x = data_raw.X.sum(axis=1)
     y = (data_raw.X > 0).sum(axis=1)
     plt.scatter(x, y, s=1)
@@ -266,7 +300,13 @@ def local_regression_norm_plot(data_raw: AnnData, data_norm: AnnData):
 
 
 def ranked_protein_by_completenes_plot(data: AnnData, full_data: AnnData):
+    """
+    Plot ranking the proteins by completeness
 
+    Args:
+        data (AnnData): AnnData object
+        full_data (AnnData): All the three datasets
+    """
     for name, data in full_data.items():
         completeness = (data.X > 0).sum(axis=0) / data.X.shape[0]
         sorted_completeness = np.sort(completeness)[::-1]
@@ -281,8 +321,14 @@ def ranked_protein_by_completenes_plot(data: AnnData, full_data: AnnData):
     plt.show()
 
 
-def log_mean_protein_abuncance_plot(data: AnnData, full_data: AnnData):
+def log_mean_protein_abundance_plot(data: AnnData, full_data: AnnData):
+    """
+    Log_mean_protein_abundance_plot
 
+    Args:
+        data (AnnData): AnnData object
+        full_data (AnnData): All three datasets used for the plot
+    """
     for datasetname, data in full_data.items():
         x = np.nanmean(data.X, axis=0)
         y = np.nanmean(data.X > 0, axis=0)
@@ -294,15 +340,3 @@ def log_mean_protein_abuncance_plot(data: AnnData, full_data: AnnData):
     plt.ylabel("Completeness accross cells")
     plt.legend(markerscale=5.0, loc="upper left")
     plt.show()
-
-
-# def abundance_val_distribution(data: AnnData):
-
-#     for name, data in full_data.items():
-#         vals = data.X.flatten()
-#     vals = vals[vals != 0]
-#     plt.hist(vals, bins=100)
-#     plt.title(name)
-#     plt.xlabel('log_10 abundance')
-#     plt.ylabel('Count')
-#     plt.show()

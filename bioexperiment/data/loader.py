@@ -9,7 +9,36 @@ from numpy import nan
 import bioexperiment.data.loader_definitions as ldef
 
 
+def read_protein_data(data_folder_path: Path) -> Dict[str, AnnData]:
+    """
+    This function reads the two tsv files containing the raw protein dataset
+    as well as the protein dataset with local regression normalization.
+
+    Args:
+        data_folder_path (Path): The path where the data is saved
+
+    Returns:
+        Dict[str, AnnData]: AnnData object
+    """
+    raw_data = read_tsv_file(data_folder_path, ldef.ProteinData.raw_file)
+    norm_data = read_tsv_file(
+        data_folder_path, ldef.ProteinData.normalized_file, fill_filtered_or_nan=nan
+    )
+    return {"raw": raw_data, "norm": norm_data}
+
+
 def read_smartseq_data(data_folder_path: Path) -> AnnData:
+    """
+    This function loads and concatenates data from "HeLa-CCL2 cell heterogeneity
+    studied by single-cell DNA and RNA sequencing"
+    https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE129447
+    (SMART-Seq2 data from 9, 14 and 20 passages)
+    Args:
+        data_folder_path (Path): The path where the data is saved
+
+    Returns:
+        AnnData: AnnData object
+    """
     data = [
         read_annotated_txt_file(data_folder_path, filename)
         for filename in ldef.Smartseq.files
@@ -21,23 +50,24 @@ def read_smartseq_data(data_folder_path: Path) -> AnnData:
 
 
 def read_dropseq_data(data_folder_path: Path) -> AnnData:
+    """
+    This function loads and concatenates data from "The transcriptome
+    dynamics of single cells during the cell cycle"
+    https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE142277
 
-    return anndata.concat(
-        [
-            read_intron_exon_txt_file(
-                data_folder_path, file_pair["exon"], file_pair["intron"]
-            )
-            for file_pair in ldef.Dropseq.files.values()
-        ]
-    )
+    Args:
+        data_folder_path (Path): the path where the data is saved
 
-
-def read_protein_data(data_folder_path: Path) -> Dict[str, AnnData]:
-    raw_data = read_tsv_file(data_folder_path, ldef.ProteinData.raw_file)
-    norm_data = read_tsv_file(
-        data_folder_path, ldef.ProteinData.normalized_file, fill_filtered_or_nan=nan
-    )
-    return {"raw": raw_data, "norm": norm_data}
+    Returns:
+        AnnData: AnnData object
+    """
+    ann_data_read = [
+        read_intron_exon_txt_file(
+            data_folder_path, file_pair["exon"], file_pair["intron"]
+        )
+        for file_pair in ldef.Dropseq.files.values()
+    ]
+    return anndata.concat(ann_data_read, join="outer", fill_value=0.0)
 
 
 def read_tsv_file(
@@ -47,19 +77,17 @@ def read_tsv_file(
     annotation_column: str = "Genes",
     fill_filtered_or_nan: float = 0.0,
 ) -> anndata.AnnData:
-
     """
     This function reads a .tsv file, preprocess and returns an annotated data object.
 
     Args:
-        data_folder_path (str): path under which file can be found
-        filename (str): the name of the file to be read and saved into memory
-        col_keyword_filter: substring used to filter columns in the file
-        annotation_column: column from annotation csv to be used
+        data_folder_path (str): Path under which file can be found
+        filename (str): The name of the file to be read and saved into memory
+        col_keyword_filter: Substring used to filter columns in the file
+        annotation_column: Column from annotation csv to be used
     Returns:
         _type_: AnnData matrix
     """
-
     cols = list(pd.read_csv(data_folder_path / filename, nrows=1, sep="\t"))
     prot = pd.read_csv(
         data_folder_path / filename,
@@ -84,6 +112,16 @@ def read_tsv_file(
 
 
 def read_annotated_txt_file(data_folder_path: Path, filename: str) -> AnnData:
+    """
+    This function reads specified .txt files and returns an annotated data object
+
+    Args:
+        data_folder_path (Path): Path to the data that is being read
+        filename (str): The name of the file to be read
+
+    Returns:
+        AnnData: AnnData object
+    """
     return anndata.read_text(data_folder_path / filename).transpose()
 
 
@@ -91,19 +129,19 @@ def read_intron_exon_txt_file(
     data_folder_path: Path, exon_filename: str, intron_filename: str
 ) -> anndata.AnnData:
     """
-    This function reads specified .txt files and returns an annotated data object
+    This function reads specified .txt intron and exon files and returns
+    an annotated data object
 
     Args:
-        data_folder_path (str): path under which file can be found
-        exon_filename (str): the name of the exon file to be read and
+        data_folder_path (str): Path under which file can be found
+        exon_filename (str): The name of the exon file to be read and
             saved into memory
-        intron_filename (str): the name of the intron file to be read and
+        intron_filename (str): The name of the intron file to be read and
             saved into memory
 
     Returns:
         _type_: AnnData matrix
     """
-
     adata_exon = read_annotated_txt_file(data_folder_path, exon_filename)
     adata_intron = read_annotated_txt_file(data_folder_path, intron_filename)
 
@@ -137,19 +175,21 @@ def read_intron_exon_txt_file(
     return adata_exon_intron
 
 
-def read_proteome_file(filename: str, to_be_read: str = "Genes") -> List[str]:
-
-    """Reading a txt proteome file.
+def read_proteome_file(data_folder_path: Path, to_be_read: str = "Genes") -> List[str]:
+    """
+    Reading a txt proteome file.
 
     Args:
-        filename (str): name of file to be read
-        to_be_read (str): name of column to be read
+        filename (str): Name of file to be read
+        to_be_read (str): Name of column to be read
 
     Returns:
-        _type_: a list of core proteomes read from file
+        List[str]: a list of core proteomes read from file
     """
+    dir_core_proteome = ldef.CoreProteome.file
 
-    dir_core_proteome = filename
-    core_proteins = list(pd.read_csv(dir_core_proteome, sep="\t")[to_be_read])
+    core_proteins = list(
+        pd.read_csv(data_folder_path / dir_core_proteome, sep="\t")[to_be_read]
+    )
 
     return core_proteins
